@@ -1,0 +1,117 @@
+/* Default Light Theme */
+:root {
+  --bg-color: #ffffff;
+  --text-color: #333333;
+  --header-bg: #f0f0f0;
+  --sidebar-bg: #e0e0e0;
+  --main-bg: #ffffff;
+  --footer-bg: #f0f0f0;
+  --link-color: #007bff;
+}
+
+/* Dark Theme */
+body.dark {
+  --bg-color: #1e1e1e;
+  --text-color: #f9f9f9;
+  --header-bg: #2e2e2e;
+  --sidebar-bg: #3a3a3a;
+  --main-bg: #262626;
+  --footer-bg: #2e2e2e;
+  --link-color: #1e90ff;
+}
+
+/* General Styles */
+body {
+  margin: 0;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+}
+
+/* Grid Layout */
+.dashboard {
+  display: grid;
+  grid-template-areas:
+    "header header"
+    "sidebar main"
+    "footer footer";
+  grid-template-columns: 250px 1fr;
+  grid-template-rows: auto 1fr auto;
+  height: 100vh;
+}
+
+/* Header */
+.header {
+  grid-area: header;
+  background-color: var(--header-bg);
+  padding: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Sidebar */
+.sidebar {
+  grid-area: sidebar;
+  background-color: var(--sidebar-bg);
+  padding: 1rem;
+  height: 100%;
+}
+.sidebar ul {
+  list-style: none;
+  padding: 0;
+}
+.sidebar li {
+  margin: 1rem 0;
+}
+.sidebar a {
+  color: var(--link-color);
+  text-decoration: none;
+  font-weight: 500;
+}
+.sidebar a:hover {
+  text-decoration: underline;
+}
+
+/* Main */
+.main {
+  grid-area: main;
+  background-color: var(--main-bg);
+  padding: 2rem;
+}
+
+/* Footer */
+.footer {
+  grid-area: footer;
+  background-color: var(--footer-bg);
+  text-align: center;
+  padding: 1rem;
+  font-size: 0.9rem;
+}
+
+/* Theme Toggle Button */
+#themeToggle {
+  padding: 0.5rem 1rem;
+  border: none;
+  background-color: var(--link-color);
+  color: #fff;
+  border-radius: 5px;
+  cursor: pointer;
+}
+#themeToggle:hover {
+  background-color: #0056b3;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .dashboard {
+    grid-template-areas:
+      "header"
+      "main"
+      "sidebar"
+      "footer";
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr auto auto;
+  }
+}
