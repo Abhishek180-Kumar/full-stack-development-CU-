@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dynamic Product Filter</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f9;
+      padding: 20px;
+    }
+    .container {
+      max-width: 800px;
+      margin: auto;
+      background: #fff;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    h2 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    select {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 20px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      font-size: 16px;
+    }
+    .products {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 15px;
+    }
+    .product {
+      padding: 15px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      text-align: center;
+      transition: 0.3s;
+      background: #fafafa;
+    }
+    .product:hover {
+      background: #f0f0f0;
+      transform: translateY(-3px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .category {
+      font-size: 14px;
+      color: #777;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Dynamic Product Filter</h2>
+
+    <!-- Dropdown Filter -->
+    <select id="categoryFilter">
+      <option value="all">All</option>
+      <option value="shoes">Shoes</option>
+      <option value="shirts">Shirts</option>
+      <option value="gadgets">Gadgets</option>
+    </select>
+
+    <!-- Product List -->
+    <div class="products" id="productList">
+      <div class="product" data-category="shoes">
+        <h3>Running Shoes</h3>
+        <p class="category">Shoes</p>
+      </div>
+      <div class="product" data-category="shirts">
+        <h3>Cotton Shirt</h3>
+        <p class="category">Shirts</p>
+      </div>
+      <div class="product" data-category="gadgets">
+        <h3>Smart Watch</h3>
+        <p class="category">Gadgets</p>
+      </div>
+      <div class="product" data-category="shoes">
+        <h3>Sports Sneakers</h3>
+        <p class="category">Shoes</p>
+      </div>
+      <div class="product" data-category="shirts">
+        <h3>Formal Shirt</h3>
+        <p class="category">Shirts</p>
+      </div>
+      <div class="product" data-category="gadgets">
+        <h3>Wireless Earbuds</h3>
+        <p class="category">Gadgets</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const filter = document.getElementById("categoryFilter");
+    const products = document.querySelectorAll(".product");
+
+    filter.addEventListener("change", () => {
+      const selected = filter.value;
+
+      products.forEach(product => {
+        const category = product.getAttribute("data-category");
+        
+        if (selected === "all" || category === selected) {
+          product.style.display = "block";
+        } else {
+          product.style.display = "none";
+        }
+      });
+    });
+  </script>
+</body>
+</html>

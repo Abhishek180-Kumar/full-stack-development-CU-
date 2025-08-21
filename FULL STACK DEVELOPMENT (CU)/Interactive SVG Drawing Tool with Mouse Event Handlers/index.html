@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Interactive SVG Drawing Tool</title>
+  <style>
+    :root {
+      --bg: #0e0f12;
+      --panel: #171a21;
+      --ink: #e8eaed;
+      --muted: #9aa0a6;
+      --accent: #6aa1ff;
+      --border: #2a2f3a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, 'Helvetica Neue', Arial, 'Noto Sans', 'Apple Color Emoji', 'Segoe UI Emoji';
+      background: var(--bg);
+      color: var(--ink);
+      line-height: 1.35;
+      display: grid;
+      place-items: start center;
+      min-height: 100vh;
+      padding: 24px;
+    }
+    .app {
+      width: min(1100px, 100%);
+    }
+    .title {
+      font-weight: 700;
+      letter-spacing: .2px;
+      margin: 0 0 12px;
+    }
+    .toolbar {
+      display: grid;
+      grid-template-columns: repeat(6, max-content) 1fr max-content max-content;
+      gap: 10px 14px;
+      align-items: center;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      padding: 12px;
+      border-radius: 14px 14px 0 0;
+    }
+    label { font-size: 14px; color: var(--muted); }
+    select, input[type="number"], input[type="color"], button {
+      background: #0f1218;
+      color: var(--ink);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 10px;
+      font-size: 14px;
+      outline: none;
+    }
+    select:focus, input:focus, button:focus { border-color: var(--accent); }
+    .btn {
+      cursor: pointer;
+      transition: transform .06s ease, background .2s ease, border-color .2s ease, opacity .2s ease;
+    }
+    .btn:hover { transform: translateY(-1px); }
+    .btn.secondary { background: #12151c; }
+    .canvas-wrap {
+      background: #0b0d11;
+      border: 1px solid var(--border);
+      border-top: none;
+      border-radius: 0 0 14px 14px;
+      padding: 10px;
+      box-shadow: 0 6px 24px rgba(0,0,0,.3) inset;
+    }
+    svg {
+      width: 100%;
+      height: 520px;
+      display: block;
+      background: repeating-conic-gradient(#0a0c10 0 25%, #0c0f14 0 50%) 50% / 24px 24px;
+      border-radius: 10px;
+      cursor: crosshair;
+    }
+    .hint { color: var(--muted); font-size: 13px; margin-top: 8px; }
+    .kbd { padding: 1px 6px; border: 1px solid var(--border); border-bottom-width: 3px; border-radius: 6px; background: #0f1218; font-size: 12px; color: var(--ink); }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <h1 class="title">Interactive SVG Drawing Tool</h1>
+
+    <section class="toolbar">
+      <label for="shape">Shape</label>
+      <select id="shape">
+        <option value="rect">Rectangle</option>
+        <option value="line">Line</option>
+        <option value="ellipse">Ellipse</option>
+        <option value="path">Freehand (Path)</option>
+      </select>
+
+      <label for="strokeColor">Stroke</label>
+      <input type="color" id="strokeColor" value="#6aa1ff" />
+
+      <label for="fillColor">Fill</label>
+      <input type="color" id="fillColor" value="#000000" />
+
+      <label for="strokeWidth">Width</label>
+      <input type="number" id="strokeWidth" value="2" min="1" max="20" step="1" style="width: 72px" />
+
+      <label for="fillToggle">Fill?</label>
+      <input type="checkbox" id="fillToggle" />
+
+      <span></span>
+
+      <button id="undoBtn" class="btn">Undo</button>
+      <button id="clearBtn" class="btn secondary">Clear</button>
+      <button id="downloadBtn" class="btn">Download SVG</button>
+    </section>
+
+    <section class="canvas-wrap">
+      <!-- The drawing SVG canvas -->
+      <svg id="board" xmlns="http://www.w3.org/2000/svg"></svg>
+      <div class="hint">Tip: Hold <span class="kbd">Shift</span> while drawing rectangles/ellipses to keep them proportional (square/circle). Hold <span class="kbd">Alt</span> to draw from center.</div>
+    </section>
+  </main>
+
+  <script>
+    const svg = document.getElementById('board');
+    const shapeSel = document.getElementById('shape');
+    const strokeColor = document.getElementById('strokeColor');
+    const fillColor = document.getElementById('fillColor');
+    const strokeWidth = document.getElementById('strokeWidth');
+    const fillToggle = document.getElementById('fillToggle');
+    const undoBtn = document.getElementById('undoBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+
+    let drawing = false;
+    let currentEl = null;
+    let startPt = null;
+    let pathData = '';
+    const history = [];
+
+    // Utility: get mouse position in SVG coordinates (handles viewBox/transforms)
+    function getMousePos(evt) {
+      const pt = svg.createSVGPoint();
+      pt.x = evt.clientX; pt.y = evt.clientY;
+      const screenCTM = svg.getScreenCTM();
+      return pt.matrixTransform(screenCTM.inverse());
+    }
+
+    function applyBaseStyle(el) {
+      el.setAttribute('stroke', strokeColor.value);
+      el.setAttribute('stroke-width', strokeWidth.value);
+      el.setAttribute('fill', fillToggle.checked ? fillColor.value : 'none');
+      el.setAttribute('vector-effect', 'non-scaling-stroke');
+      el.setAttribute('stroke-linecap', 'round');
+      el.setAttribute('stroke-linejoin', 'round');
+    }
+
+    function clamp(n) { return Number.isFinite(n) ? n : 0; }
+
+    svg.addEventListener('mousedown', (e) => {
+      // Ignore right-click
+      if (e.button !== 0) return;
+      drawing = true;
+      const { x, y } = getMousePos(e);
+      startPt = { x: clamp(x), y: clamp(y), shift: e.shiftKey, alt: e.altKey };
+
+      const kind = shapeSel.value;
+      if (kind === 'rect') {
+        currentEl = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        applyBaseStyle(currentEl);
+        currentEl.setAttribute('x', startPt.x);
+        currentEl.setAttribute('y', startPt.y);
+        currentEl.setAttribute('width', 0);
+        currentEl.setAttribute('height', 0);
+      } else if (kind === 'line') {
+        currentEl = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        applyBaseStyle(currentEl);
+        currentEl.setAttribute('x1', startPt.x);
+        currentEl.setAttribute('y1', startPt.y);
+        currentEl.setAttribute('x2', startPt.x);
+        currentEl.setAttribute('y2', startPt.y);
+      } else if (kind === 'ellipse') {
+        currentEl = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
+        applyBaseStyle(currentEl);
+        currentEl.setAttribute('cx', startPt.x);
+        currentEl.setAttribute('cy', startPt.y);
+        currentEl.setAttribute('rx', 0);
+        currentEl.setAttribute('ry', 0);
+      } else if (kind === 'path') {
+        currentEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        applyBaseStyle(currentEl);
+        pathData = `M ${startPt.x} ${startPt.y}`;
+        currentEl.setAttribute('d', pathData);
+        // For freehand, ignore fill
+        currentEl.setAttribute('fill', 'none');
+      }
+      if (currentEl) svg.appendChild(currentEl);
+    });
+
+    svg.addEventListener('mousemove', (e) => {
+      if (!drawing || !currentEl) return;
+      const { x, y } = getMousePos(e);
+      const kind = shapeSel.value;
+
+      if (kind === 'rect') {
+        const dx = x - startPt.x;
+        const dy = y - startPt.y;
+        let w = Math.abs(dx);
+        let h = Math.abs(dy);
+        if (e.shiftKey) { // keep square
+          const s = Math.min(w, h);
+          w = h = s;
+        }
+        let rx = dx < 0 ? startPt.x - w : startPt.x;
+        let ry = dy < 0 ? startPt.y - h : startPt.y;
+        if (e.altKey) { // draw from center
+          rx = startPt.x - w;
+          ry = startPt.y - h;
+          w *= 2; h *= 2;
+        }
+        currentEl.setAttribute('x', rx);
+        currentEl.setAttribute('y', ry);
+        currentEl.setAttribute('width', w);
+        currentEl.setAttribute('height', h);
+      } else if (kind === 'line') {
+        currentEl.setAttribute('x2', x);
+        currentEl.setAttribute('y2', y);
+      } else if (kind === 'ellipse') {
+        const rx = Math.abs(x - startPt.x);
+        const ry = Math.abs(y - startPt.y);
+        if (e.shiftKey) {
+          const r = Math.min(rx, ry);
+          currentEl.setAttribute('rx', r);
+          currentEl.setAttribute('ry', r);
+        } else {
+          currentEl.setAttribute('rx', rx);
+          currentEl.setAttribute('ry', ry);
+        }
+        if (!e.altKey) {
+          // default: corner to corner => center is start to current midpoint
+          currentEl.setAttribute('cx', (startPt.x + x) / 2);
+          currentEl.setAttribute('cy', (startPt.y + y) / 2);
+        } else {
+          // alt: draw from center
+          currentEl.setAttribute('cx', startPt.x);
+          currentEl.setAttribute('cy', startPt.y);
+        }
+      } else if (kind === 'path') {
+        pathData += ` L ${x} ${y}`;
+        currentEl.setAttribute('d', pathData);
+      }
+    });
+
+    window.addEventListener('mouseup', (e) => {
+      if (!drawing) return;
+      drawing = false;
+      if (currentEl) {
+        // If the shape has zero size (a click without drag), remove it
+        const kind = shapeSel.value;
+        let remove = false;
+        if (kind === 'rect') {
+          const w = parseFloat(currentEl.getAttribute('width')) || 0;
+          const h = parseFloat(currentEl.getAttribute('height')) || 0;
+          remove = (w === 0 && h === 0);
+        } else if (kind === 'line') {
+          const x1 = +currentEl.getAttribute('x1');
+          const y1 = +currentEl.getAttribute('y1');
+          const x2 = +currentEl.getAttribute('x2');
+          const y2 = +currentEl.getAttribute('y2');
+          remove = (x1 === x2 && y1 === y2);
+        } else if (kind === 'ellipse') {
+          const rx = +currentEl.getAttribute('rx');
+          const ry = +currentEl.getAttribute('ry');
+          remove = (rx === 0 && ry === 0);
+        } else if (kind === 'path') {
+          // If path has just a Move command
+          remove = (currentEl.getAttribute('d')?.split('L').length <= 1);
+        }
+        if (remove) {
+          currentEl.remove();
+        } else {
+          history.push(currentEl);
+        }
+      }
+      currentEl = null;
+      startPt = null;
+      pathData = '';
+    });
+
+    // Controls
+    undoBtn.addEventListener('click', () => {
+      const el = history.pop();
+      if (el) el.remove();
+    });
+
+    clearBtn.addEventListener('click', () => {
+      history.splice(0, history.length);
+      while (svg.lastChild) svg.removeChild(svg.lastChild);
+    });
+
+    downloadBtn.addEventListener('click', () => {
+      // Create a clone to embed style attrs into the file
+      const clone = svg.cloneNode(true);
+      // Optional: add viewBox for scalability if not present
+      if (!clone.hasAttribute('viewBox')) {
+        const r = svg.getBoundingClientRect();
+        clone.setAttribute('viewBox', `0 0 ${Math.round(r.width)} ${Math.round(r.height)}`);
+      }
+      const xmlns = 'http://www.w3.org/2000/svg';
+      clone.setAttribute('xmlns', xmlns);
+      const svgString = new XMLSerializer().serializeToString(clone);
+      const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'drawing.svg';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    });
+
+    // Keep stroke color and fill color live-binding when drawing freehand after mousedown
+    [strokeColor, fillColor, strokeWidth, fillToggle].forEach(ctrl => {
+      ctrl.addEventListener('change', () => {
+        if (currentEl) applyBaseStyle(currentEl);
+      });
+    });
+
+    // Accessibility: keyboard shortcuts
+    window.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        undoBtn.click();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        downloadBtn.click();
+      }
+    });
+  </script>
+</body>
+</html>
